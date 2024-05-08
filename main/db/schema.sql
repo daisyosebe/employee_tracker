@@ -5,7 +5,7 @@ CREATE DATABASE department_db;
 
 CREATE TABLE department (
   id SERIAL PRIMARY KEY,
-    name VARCHAR(30) UNIQUE NOT NULL
+    name: VARCHAR(30) UNIQUE NOT NULL
 );
 
 CREATE TABLE role (
@@ -14,11 +14,7 @@ CREATE TABLE role (
     salary: DECIMAL NOT NULL
     review TEXT NOT NULL,
     department_id: INTEGER NOT NULL
-    FOREIGN KEY (movie_id)
-    REFERENCES movies(id)
-    ON DELETE SET NULL
 );
-
 
 CREATE TABLE employee (
     id SERIAL PRIMARY KEY,
