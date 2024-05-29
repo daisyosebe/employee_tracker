@@ -123,9 +123,34 @@ function addEmployee() {
   
   
 //TODO: UPDATE EMPLOYEE ROLE
-  function updateEmployeeRole(){
-      
-}
+function updateEmployeeRole() {
+    inquirer.prompt([
+      {
+        type: 'input',
+        name: 'employeeId',
+        message: 'Enter the ID of the employee you want to update:'
+      },
+      {
+        type: 'input',
+        name: 'newRoleId',
+        message: 'Enter the new role ID for the employee:'
+      }
+    ]).then((answers) => {
+      client.query(
+        'UPDATE employees SET role_id = $1 WHERE id = $2',
+        [answers.newRoleId, answers.employeeId],
+        (err) => {
+          if (err) {
+            console.error('Query error', err.stack);
+          } else {
+            console.log('Employee role updated!');
+            start();
+          }
+        }
+      );
+    });
+  }
+  
 
 // TODO: VIEW ROLES
 function viewRoles(){
