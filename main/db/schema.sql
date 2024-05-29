@@ -46,3 +46,5 @@ JOIN role ON employee.role_id = role.id
 JOIN department ON department.id = role.department_id
 JOIN employee AS manager ON employee.manager_id = manager.id 
 
+
+

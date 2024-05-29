@@ -1,38 +1,14 @@
-const express = require('express');
+const { Client } = require('pg');
+const inquirer = require('inquirer');
 
-const routes = require("./routes")
-
-const port = 3001;
-const app = express();
-
-inquirer.prompt([
-    {
-        type: "input",
-        message: "What is the name of the department?",
-        name : "department",
-    },
-    {
-        type: "input",
-        message: "What is the name of the Role? ",
-        name : "role"
-    },
-    {
-        type: "input",
-        message: "what is the salary of the role ",
-        name : "salary"
-    }
-
-]).then (response => {
-    if(response.shape == "circle"){
-        const shape = new circle(response.shapeColor)
-    }
+const client = new Client({
+  user: '',
+  host: 'localhost',
+  database: '',
+  password: 'daisy',
+  port: 3001,
 });
 
-
-
-
-
-
-app.listen(PORT, () =>
-  console.log(`Example app listening at http://localhost:${PORT}`)
-);
+client.connect()
+  .then(() => console.log('Connected to the database'))
+  .catch(err => console.error('Connection error', err.stack));
