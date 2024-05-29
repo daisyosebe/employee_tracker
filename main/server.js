@@ -61,9 +61,25 @@ client.connect()
   }
 
 // TODO: VIEW EOMPLOYEES
-  function viewEmployees(){
-      
-}
+function viewEmployees() {
+    const query = `
+      SELECT employees.*, roles.title AS job_title, roles.salary, departments.name AS department_name,
+      CONCAT(managers.first_name, ' ', managers.last_name) AS manager_name
+      FROM employees
+      LEFT JOIN roles ON employees.role_id = roles.id
+      LEFT JOIN departments ON roles.department_id = departments.id
+      LEFT JOIN employees managers ON employees.manager_id = managers.id;
+    `;
+    client.query(query, (err, res) => {
+      if (err) {
+        console.error('Query error', err.stack);
+      } else {
+        console.table(res.rows);
+        start();
+      }
+    });
+  }
+  
 
 //TODO: ADD EMPLOYEE
   function addEmployee(){
