@@ -153,23 +153,98 @@ function updateEmployeeRole() {
   
 
 // TODO: VIEW ROLES
-function viewRoles(){
-    
-}
+function viewRoles() {
+    const query = `
+      SELECT roles.*, departments.name AS department_name
+      FROM roles
+      JOIN departments ON roles.department_id = departments.id;
+    `;
+    client.query(query, (err, res) => {
+      if (err) {
+        console.error('Query error', err.stack);
+      } else {
+        console.table(res.rows);
+        start();
+      }
+    });
+  }
+  
 
 // TODO: ADD ROLE
-function addRole(){
-    
-}
+function addRole() {
+    inquirer.prompt([
+      {
+        type: 'input',
+        name: 'roleTitle',
+        message: 'Enter the title of the new role:'
+      },
+      {
+        type: 'input',
+        name: 'roleSalary',
+        message: 'Enter the salary for the new role:'
+      },
+      {
+        type: 'input',
+        name: 'roleDepartment',
+        message: 'Enter the department ID for the new role:'
+      }
+    ]).then((answers) => {
+      client.query(
+        'INSERT INTO roles (title, salary, department_id) VALUES ($1, $2, $3)',
+        [answers.roleTitle, answers.roleSalary, answers.roleDepartment],
+        (err) => {
+          if (err) {
+            console.error('Query error', err.stack);
+          } else {
+            console.log('Role added!');
+            start();
+          }
+        }
+      );
+    });
+  }
+  
 
 // TODO: VIEW DEPARTMENTS
-function viewDepartments(){
-    
-}
+function viewEmployees() {
+    const query = `
+      SELECT employees.*, roles.title AS job_title, roles.salary, departments.name AS department_name,
+      CONCAT(managers.first_name, ' ', managers.last_name) AS manager_name
+      FROM employees
+      LEFT JOIN roles ON employees.role_id = roles.id
+      LEFT JOIN departments ON roles.department_id = departments.id
+      LEFT JOIN employees managers ON employees.manager_id = managers.id;
+    `;
+    client.query(query, (err, res) => {
+      if (err) {
+        console.error('Query error', err.stack);
+      } else {
+        console.table(res.rows);
+        start();
+      }
+    });
+  }
+  
 
 // TODO: ADD DEPARTMENT
-function addDepartment(){
-    
-}
+function addDepartment() {
+    inquirer.prompt([
+      {
+        type: 'input',
+        name: 'departmentName',
+        message: 'Enter the name of the new department:'
+      }
+    ]).then((answer) => {
+      client.query('INSERT INTO departments (name) VALUES ($1)', [answer.departmentName], (err) => {
+        if (err) {
+          console.error('Query error', err.stack);
+        } else {
+          console.log('Department added!');
+          start();
+        }
+      });
+    });
+  }
+  
 
 tracker();
