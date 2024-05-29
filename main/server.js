@@ -22,11 +22,17 @@ function tracker() {
       choices: [
         'View All Employees',
         'Add Employee',
+        'View Employee by Manager',
         'Update Employee Role',
+        'View Employee By Department',
+        'Delete Employee',
         'View All Roles',
         'Add Role',
+        'Delete Role',
         'View All Departments',
         'Add Department',
+        'Delete Department',
+        'View Department Budget',
         'Exit'
       ]
     }
@@ -44,9 +50,6 @@ function tracker() {
         case 'Update Employee Role':
             updateEmployeeManager();
          break;
-        case 'Update Employee Role':
-            updateEmployeeRole();
-        break;
         case 'View Employee By Department':
             viewEmployeesByDepartment();
          break;
