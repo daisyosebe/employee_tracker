@@ -82,9 +82,45 @@ function viewEmployees() {
   
 
 //TODO: ADD EMPLOYEE
-  function addEmployee(){
+function addEmployee() {
+    inquirer.prompt([
+      {
+        type: 'input',
+        name: 'firstName',
+        message: 'Enter the first name of the employee:'
+      },
+      {
+        type: 'input',
+        name: 'lastName',
+        message: 'Enter the last name of the employee:'
+      },
+      {
+        type: 'input',
+        name: 'roleId',
+        message: 'Enter the role ID for the employee:'
+      },
+      {
+        type: 'input',
+        name: 'managerId',
+        message: 'Enter the manager ID for the employee (leave blank if none):',
+        default: null
+      }
+    ]).then((answers) => {
+      client.query(
+        'INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)',
+        [answers.firstName, answers.lastName, answers.roleId, answers.managerId],
+        (err) => {
+          if (err) {
+            console.error('Query error', err.stack);
+          } else {
+            console.log('Employee added!');
+            start();
+          }
+        }
+      );
+    });
+  }
   
-}
   
 //TODO: UPDATE EMPLOYEE ROLE
   function updateEmployeeRole(){
