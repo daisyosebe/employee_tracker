@@ -88,8 +88,8 @@ function tracker() {
 // VIEW EMPLOYEES
 function viewEmployees() {
   const query = `
-    SELECT employees.*, roles.title AS job_title, roles.salary, departments.name AS department_name,
-    CONCAT(managers.first_name, ' ', managers.last_name) AS manager_name
+  SELECT employees.id, employees.first_name, employees.last_name, roles.title AS job_title, roles.salary, departments.name AS department_name,
+  CONCAT(managers.first_name, ' ', managers.last_name) AS manager_name
     FROM employees
     LEFT JOIN roles ON employees.role_id = roles.id
     LEFT JOIN departments ON roles.department_id = departments.id
@@ -99,11 +99,20 @@ function viewEmployees() {
     if (err) {
       console.error('Query error', err.stack);
     } else {
-      console.table(res.rows);
-      tracker();
+        const result = res.rows.map(row => ({
+            "ID": row.id,
+            "First Name": row.first_name,
+            "Last Name": row.last_name,
+            "Job Title": row.job_title,
+            "Department": row.department_name,
+            "Salary": row.salary,
+            "Manager": row.manager_name
+          }));
+          console.table(result);
+          tracker();
+        }
+      });
     }
-  });
-}
 
 // ADD EMPLOYEE
 function addEmployee() {
@@ -289,19 +298,25 @@ function viewEmployeesByManager() {
   // VIEW ROLES
   function viewRoles() {
       const query = `
-    SELECT roles.*, departments.name AS department_name
-    FROM roles
+      SELECT roles.id, roles.title, roles.salary, departments.name AS department_name
+      FROM roles
     JOIN departments ON roles.department_id = departments.id;
     `;
   client.query(query, (err, res) => {
     if (err) {
       console.error('Query error', err.stack);
     } else {
-      console.table(res.rows);
-      tracker();
+        const result = res.rows.map(row => ({
+            "ID": row.id,
+            "Title": row.title,
+            "Department Name": row.department_name,
+            "Salary": row.salary
+          }));
+          console.table(result);
+          tracker();
+        }
+      });
     }
-});
-}
 
 // ADD ROLE
 function addRole() {
@@ -364,17 +379,22 @@ function deleteRole() {
 // VIEW DEPARTMENTS
 function viewDepartments() {
     const query = `
-    SELECT * FROM departments;
+    SELECT id, name AS department_name
+    FROM departments;
   `;
   client.query(query, (err, res) => {
     if (err) {
       console.error('Query error', err.stack);
     } else {
-      console.table(res.rows);
-      tracker();
+        const result = res.rows.map(row => ({
+            "ID": row.id,
+            "Department": row.department_name
+          }));
+          console.table(result);
+          tracker();
+        }
+      });
     }
-  });
-}
 
 // ADD DEPARTMENT
 function addDepartment() {
