@@ -290,7 +290,7 @@ function viewEmployeesByDepartment() {
               console.error('Query error', err.stack);
             } else {
               if (res.rows.length === 0) {
-                console.log('No employees in this department yet.');
+                console.log('Department needs employees.');
               } else {
                 const result = res.rows.map(row => ({
                   "ID": row.id,
@@ -452,27 +452,37 @@ function addDepartment() {
 
 // VIEW DEPARTMENT BUDGET
 function viewDepartmentBudget() {
-  inquirer.prompt([
-    {
-      type: 'input',
-      name: 'departmentId',
-      message: 'Enter the ID of the department:'
-    }
-  ]).then((answers) => {
-    const query = `
-      SELECT SUM(roles.salary) AS total_budget
-      FROM employees
-      JOIN roles ON employees.role_id = roles.id
-      WHERE roles.department_id = $1;
-    `;
-    client.query(query, [answers.departmentId], (err, res) => {
+    client.query('SELECT * FROM departments', (err, res) => {
       if (err) {
         console.error('Query error', err.stack);
       } else {
-        console.log(`Total Utilized Budget of Department ${answers.departmentId}: $${res.rows[0].total_budget}`);
-        tracker();
+        const departments = res.rows.map(department => ({ name: department.name, value: department.id }));
+  
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'departmentId',
+            message: 'Select the department to view its total utilized budget:',
+            choices: departments
+          }
+        ]).then((answer) => {
+          const query = `
+            SELECT SUM(roles.salary) AS total_budget
+            FROM employees
+            LEFT JOIN roles ON employees.role_id = roles.id
+            WHERE roles.department_id = $1;
+          `;
+          client.query(query, [answer.departmentId], (err, res) => {
+            if (err) {
+              console.error('Query error', err.stack);
+            } else {
+              console.log(`Total utilized budget for the selected department: $${res.rows[0].total_budget}`);
+              tracker();
+            }
+          });
+        });
       }
     });
-  });
-}
-tracker();
+  }
+  
+  tracker();

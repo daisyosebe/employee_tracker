@@ -32,14 +32,14 @@ CREATE TABLE employees (
 -- Initial data into departments table
 INSERT INTO departments (name)
 VALUES 
-  ('Engineering'),
+  ('Mechanics'),
   ('Developers'),
   ('Finance');
 
 --Initial data into roles table
 INSERT INTO roles (title, salary, department_id)
 VALUES 
-  ('CEO', 200000.00, 1),
+  ('CEO', 500000.00, 1),
   ('Junior Developer', 60000.00, 2),
   ('Finacial Advisor', 100000.00, 3);
 
