@@ -49,3 +49,7 @@ VALUES
   ('John', 'Doe', 1, NULL),
   ('Rachel', 'Adams', 2, 1),
   ('Chris', 'Rock', 3, 1);
+
+SELECT * FROM departments;
+SELECT * FROM roles;
+SELECT * FROM employees;
