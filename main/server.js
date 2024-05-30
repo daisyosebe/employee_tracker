@@ -22,7 +22,8 @@ function tracker() {
       choices: [
         'View All Employees',
         'Add Employee',
-        'View Employee by Manager',
+        'View Employees by Manager',
+        'Update Employee Manager',
         'Update Employee Role',
         'View Employee By Department',
         'Delete Employee',
@@ -44,11 +45,14 @@ function tracker() {
         case 'Add Employee':
             addEmployee();
         break;
-        case 'View Employee By Manager':
+        case 'View Employees By Manager':
             viewEmployeesByManager();
          break;
-        case 'Update Employee Role':
+         case 'Update Employee Manager':
             updateEmployeeManager();
+         break;
+        case 'Update Employee Role':
+            updateEmployeeRole();
          break;
         case 'View Employee By Department':
             viewEmployeesByDepartment();
@@ -116,181 +120,298 @@ function viewEmployees() {
 
 // ADD EMPLOYEE
 function addEmployee() {
-  inquirer.prompt([
-    {
-      type: 'input',
-      name: 'firstName',
-      message: 'Enter the first name of the employee:'
-    },
-    {
-      type: 'input',
-      name: 'lastName',
-      message: 'Enter the last name of the employee:'
-    },
-    {
-      type: 'input',
-      name: 'roleId',
-      message: 'Enter the role ID for the employee:'
-    },
-    {
-      type: 'input',
-      name: 'managerId',
-      message: 'Enter the manager ID for the employee (leave blank if none):',
-      default: null
-    }
-  ]).then((answers) => {
-    client.query(
-      'INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)',
-      [answers.firstName, answers.lastName, answers.roleId, answers.managerId],
-      (err) => {
-        if (err) {
-          console.error('Query error', err.stack);
-        } else {
-          console.log('Employee added!');
-          tracker();
-        }
+    const roleQuery = 'SELECT id, title FROM roles';
+    const managerQuery = 'SELECT id, CONCAT(first_name, last_name) AS name FROM employees';
+    
+    
+    client.query(roleQuery, (roleErr, roleRes) => {
+      if (roleErr) {
+        console.error('Query error', roleErr.stack);
+      } else {
+        const roles = roleRes.rows.map(role => ({ name: role.title, value: role.id }));
+        
+        client.query(managerQuery, (managerErr, managerRes) => {
+          if (managerErr) {
+            console.error('Query error', managerErr.stack);
+          } else {
+            const managers = managerRes.rows.map(manager => ({ name: manager.name, value: manager.id }));
+            managers.push({ name: 'None', value: null });
+  
+            inquirer.prompt([
+              {
+                type: 'input',
+                name: 'firstName',
+                message: 'Enter the first name of the employee:'
+              },
+              {
+                type: 'input',
+                name: 'lastName',
+                message: 'Enter the last name of the employee:'
+              },
+              {
+                type: 'list',
+                name: 'roleId',
+                message: 'Select the role for the employee:',
+                choices: roles
+              },
+              {
+                type: 'list',
+                name: 'managerId',
+                message: 'Select the manager for the employee (if any):',
+                choices: managers
+              }
+            ]).then((answers) => {
+              client.query(
+                'INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)',
+                [answers.firstName, answers.lastName, answers.roleId, answers.managerId],
+                (err) => {
+                  if (err) {
+                    console.error('Query error', err.stack);
+                  } else {
+                    console.log('Employee added!');
+                    tracker();
+                  }
+                }
+              );
+            });
+          }
+        });
       }
-    );
-  });
-}
+    });
+  }
+  
 
 
 
 // VIEW EMPLOYEES BY MANAGER
 function viewEmployeesByManager() {
-    inquirer.prompt([
-      {
-          type: 'input',
-        name: 'managerId',
-        message: 'Enter the ID of the manager:'
+    const managerQuery = `
+      SELECT id, CONCAT(first_name, ' ', last_name) AS name
+      FROM employees
+      WHERE id IN (SELECT DISTINCT manager_id FROM employees WHERE manager_id IS NOT NULL);
+    `;
+  
+    client.query(managerQuery, (managerErr, managerRes) => {
+      if (managerErr) {
+        console.error('Query error', managerErr.stack);
+      } else {
+        const managers = managerRes.rows.map(manager => ({ name: manager.name, value: manager.id }));
+  
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'managerId',
+            message: 'Select the manager to view their employees:',
+            choices: managers
+          }
+        ]).then((answers) => {
+          const query = `
+            SELECT employees.id, employees.first_name, employees.last_name, roles.title AS job_title, roles.salary, departments.name AS department_name
+            FROM employees
+            LEFT JOIN roles ON employees.role_id = roles.id
+            LEFT JOIN departments ON roles.department_id = departments.id
+            WHERE employees.manager_id = $1;
+          `;
+          client.query(query, [answers.managerId], (err, res) => {
+            if (err) {
+              console.error('Query error', err.stack);
+            } else {
+              if (res.rows.length === 0) {
+                console.log('No employees under this manager.');
+              } else {
+                const result = res.rows.map(row => ({
+                  "ID": row.id,
+                  "First Name": row.first_name,
+                  "Last Name": row.last_name,
+                  "Job Title": row.job_title,
+                  "Salary": row.salary,
+                  "Department Name": row.department_name
+                }));
+                console.table(result);
+              }
+              tracker();
+            }
+          });
+        });
       }
-    ]).then((answers) => {
-        const query = `
-        SELECT employees.*, roles.title AS job_title, roles.salary, departments.name AS department_name
-        FROM employees
-        LEFT JOIN roles ON employees.role_id = roles.id
-        LEFT JOIN departments ON roles.department_id = departments.id
-        WHERE manager_id = $1;
-      `;
-      client.query(query, [answers.managerId], (err, res) => {
-        if (err) {
-          console.error('Query error', err.stack);
-        } else {
-          console.table(res.rows);
-          tracker();
-        }
-    });
     });
   }
   
-  // UPDATE EMPLOYEE MANAGER
-  function updateEmployeeManager() {
-      inquirer.prompt([
+  
+  
+  
+// UPDATE EMPLOYEE MANAGER
+function updateEmployeeManager() {
+    const employeeQuery = 'SELECT id, CONCAT(first_name, last_name) AS name FROM employees';
+  
+    client.query(employeeQuery, (employeeErr, employeeRes) => {
+      if (employeeErr) {
+        console.error('Query error', employeeErr.stack);
+      } else {
+        const employees = employeeRes.rows.map(employee => ({ name: employee.name, value: employee.id }));
+  
+        inquirer.prompt([
           {
-          type: 'input',
-          name: 'employeeId',
-          message: 'Enter the ID of the employee you want to update:'
-        },
-        {
-          type: 'input',
-          name: 'newManagerId',
-          message: 'Enter the new manager ID for the employee (leave blank if none):',
-          default: null
-        }
-      ]).then((answers) => {
-        client.query(
-          'UPDATE employees SET manager_id = $1 WHERE id = $2',
-          [answers.newManagerId, answers.employeeId],
-          (err) => {
-            if (err) {
-              console.error('Query error', err.stack);
-            } else {
-              console.log('Employee manager updated!');
-              tracker();
-            }
+            type: 'list',
+            name: 'employeeId',
+            message: 'Select the employee whose manager you want to update:',
+            choices: employees
+          },
+          {
+            type: 'list',
+            name: 'newManagerId',
+            message: 'Select the new manager for the employee:',
+            choices: [...employees, { name: 'None', value: null }]
           }
-        );
-      });
-    }
-
-    // UPDATE EMPLOYEE ROLE
-    function updateEmployeeRole() {
-      inquirer.prompt([
-        {
-          type: 'input',
-          name: 'employeeId',
-          message: 'Enter the ID of the employee you want to update:'
-        },
-        {
-            type: 'input',
-            name: 'newRoleId',
-          message: 'Enter the new role ID for the employee:'
-        }
-      ]).then((answers) => {
-        client.query(
-          'UPDATE employees SET role_id = $1 WHERE id = $2',
-          [answers.newRoleId, answers.employeeId],
-          (err) => {
-            if (err) {
-              console.error('Query error', err.stack);
-            } else {
-              console.log('Employee role updated!');
-              tracker();
+        ]).then((answers) => {
+          client.query(
+            'UPDATE employees SET manager_id = $1 WHERE id = $2',
+            [answers.newManagerId, answers.employeeId],
+            (err) => {
+              if (err) {
+                console.error('Query error', err.stack);
+              } else {
+                console.log('Employee manager updated!');
+                tracker();
+              }
             }
-          }
-        );
-      });
-    }
-
-  // VIEW EMPLOYEES BY DEPARTMENT
-  function viewEmployeesByDepartment() {
-    inquirer.prompt([
-      {
-        type: 'input',
-        name: 'departmentId',
-        message: 'Enter the ID of the department:'
+          );
+        });
       }
-    ]).then((answers) => {
-        const query = `
-        SELECT employees.*, roles.title AS job_title, roles.salary
-        FROM employees
-        LEFT JOIN roles ON employees.role_id = roles.id
-        WHERE roles.department_id = $1;
-      `;
-      client.query(query, [answers.departmentId], (err, res) => {
-        if (err) {
-          console.error('Query error', err.stack);
-        } else {
-          console.table(res.rows);
-          tracker();
-        }
-      });
     });
-}
+  }
   
+
+// UPDATE EMPLOYEE ROLE
+function updateEmployeeRole() {
+    const employeeQuery = 'SELECT id, CONCAT(first_name, last_name) AS name FROM employees';
+    const roleQuery = 'SELECT id, title FROM roles';
   
+    client.query(employeeQuery, (employeeErr, employeeRes) => {
+      if (employeeErr) {
+        console.error('Query error', employeeErr.stack);
+      } else {
+        const employees = employeeRes.rows.map(employee => ({ name: employee.name, value: employee.id }));
+  
+        client.query(roleQuery, (roleErr, roleRes) => {
+          if (roleErr) {
+            console.error('Query error', roleErr.stack);
+          } else {
+            const roles = roleRes.rows.map(role => ({ name: role.title, value: role.id }));
+  
+            inquirer.prompt([
+              {
+                type: 'list',
+                name: 'employeeId',
+                message: 'Select the employee you want to update:',
+                choices: employees
+              },
+              {
+                type: 'list',
+                name: 'newRoleId',
+                message: 'Select the new role for the employee:',
+                choices: roles
+              }
+            ]).then((answers) => {
+              client.query(
+                'UPDATE employees SET role_id = $1 WHERE id = $2',
+                [answers.newRoleId, answers.employeeId],
+                (err) => {
+                  if (err) {
+                    console.error('Query error', err.stack);
+                  } else {
+                    console.log('Employee role updated!');
+                    tracker();
+                  }
+                }
+              );
+            });
+          }
+        });
+      }
+    });
+  }
+  
+
+// VIEW EMPLOYEES BY DEPARTMENT
+function viewEmployeesByDepartment() {
+    const departmentQuery = 'SELECT id, name FROM departments';
+  
+    client.query(departmentQuery, (departmentErr, departmentRes) => {
+      if (departmentErr) {
+        console.error('Query error', departmentErr.stack);
+      } else {
+        const departments = departmentRes.rows.map(department => ({ name: department.name, value: department.id }));
+  
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'departmentId',
+            message: 'Select the department to view its employees:',
+            choices: departments
+          }
+        ]).then((answers) => {
+          const query = `
+            SELECT employees.id, employees.first_name, employees.last_name, roles.title AS job_title, roles.salary, departments.name AS department_name
+            FROM employees
+            LEFT JOIN roles ON employees.role_id = roles.id
+            LEFT JOIN departments ON roles.department_id = departments.id
+            WHERE departments.id = $1;
+          `;
+          client.query(query, [answers.departmentId], (err, res) => {
+            if (err) {
+              console.error('Query error', err.stack);
+            } else {
+              if (res.rows.length === 0) {
+                console.log('No employees in this department yet.');
+              } else {
+                const result = res.rows.map(row => ({
+                  "ID": row.id,
+                  "First Name": row.first_name,
+                  "Last Name": row.last_name,
+                  "Role": row.job_title,
+                  "Salary": row.salary,
+                }));
+                console.table(result);
+              }
+              tracker();
+            }
+          });
+        });
+      }
+    });
+  }
 
 // DELETE EMPLOYEE
-  function deleteEmployee() {
-    inquirer.prompt([
-      {
-        type: 'input',
-        name: 'employeeId',
-        message: 'Enter the ID of the employee you want to delete:'
-      }
-    ]).then((answers) => {
-      client.query(
-          'DELETE FROM employees WHERE id = $1',
-        [answers.employeeId],
-        (err) => {
-            if (err) {
-            console.error('Query error', err.stack);
-        } else {
-            console.log('Employee deleted!');
-            tracker();
+function deleteEmployee() {
+    const employeeQuery = 'SELECT id, first_name, last_name FROM employees';
+  
+    client.query(employeeQuery, (employeeErr, employeeRes) => {
+      if (employeeErr) {
+        console.error('Query error', employeeErr.stack);
+      } else {
+        const employees = employeeRes.rows.map(employee => ({ name: `${employee.first_name} ${employee.last_name}`, value: employee.id }));
+  
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'employeeId',
+            message: 'Select the employee to delete:',
+            choices: employees
           }
-        }
-      );
+        ]).then((answers) => {
+          const deleteQuery = 'DELETE FROM employees WHERE id = $1';
+  
+          client.query(deleteQuery, [answers.employeeId], (deleteErr) => {
+            if (deleteErr) {
+              console.error('Query error', deleteErr.stack);
+            } else {
+              console.log('Employee deleted successfully!');
+              tracker();
+            }
+          });
+        });
+      }
     });
   }
   
@@ -309,7 +430,7 @@ function viewEmployeesByManager() {
         const result = res.rows.map(row => ({
             "ID": row.id,
             "Title": row.title,
-            "Department Name": row.department_name,
+            "Department": row.department_name,
             "Salary": row.salary
           }));
           console.table(result);
@@ -320,61 +441,82 @@ function viewEmployeesByManager() {
 
 // ADD ROLE
 function addRole() {
-    inquirer.prompt([
-        {
+    const departmentQuery = 'SELECT id, name FROM departments';
+  
+    client.query(departmentQuery, (departmentErr, departmentRes) => {
+      if (departmentErr) {
+        console.error('Query error', departmentErr.stack);
+      } else {
+        const departments = departmentRes.rows.map(department => ({ name: department.name, value: department.id }));
+  
+        inquirer.prompt([
+          {
             type: 'input',
             name: 'roleTitle',
-            message: 'Enter the title of the new role:'
-        },
-    {
-        type: 'input',
-        name: 'roleSalary',
-        message: 'Enter the salary for the new role:'
-    },
-    {
-        type: 'input',
-      name: 'roleDepartment',
-      message: 'Enter the department ID for the new role:'
-    }
-]).then((answers) => {
-    client.query(
-        'INSERT INTO roles (title, salary, department_id) VALUES ($1, $2, $3)',
-      [answers.roleTitle, answers.roleSalary, answers.roleDepartment],
-      (err) => {
-        if (err) {
-            console.error('Query error', err.stack);
-        } else {
-            console.log('Role added!');
-            tracker();
-        }
-    }
-);
-  });
-}
+            message: 'Enter the name of the new role:'
+          },
+          {
+            type: 'input',
+            name: 'roleSalary',
+            message: 'Enter the salary for the new role:'
+          },
+          {
+            type: 'list',
+            name: 'roleDepartment',
+            message: 'Select the department for the new role:',
+            choices: departments
+          }
+        ]).then((answers) => {
+          client.query(
+            'INSERT INTO roles (title, salary, department_id) VALUES ($1, $2, $3)',
+            [answers.roleTitle, answers.roleSalary, answers.roleDepartment],
+            (err) => {
+              if (err) {
+                console.error('Query error', err.stack);
+              } else {
+                console.log('Role added!');
+                tracker();
+              }
+            }
+          );
+        });
+      }
+    });
+  }
+  
 
 // DELETE ROLE
 function deleteRole() {
-  inquirer.prompt([
-    {
-      type: 'input',
-      name: 'roleId',
-      message: 'Enter the ID of the role you want to delete:'
-    }
-  ]).then((answers) => {
-    client.query(
-        'DELETE FROM roles WHERE id = $1',
-        [answers.roleId],
-        (err) => {
-            if (err) {
-          console.error('Query error', err.stack);
-        } else {
-          console.log('Role deleted!');
-          tracker();
-        }
+    const roleQuery = 'SELECT id, title FROM roles';
+  
+    client.query(roleQuery, (roleErr, roleRes) => {
+      if (roleErr) {
+        console.error('Query error', roleErr.stack);
+      } else {
+        const roles = roleRes.rows.map(role => ({ name: role.title, value: role.id }));
+  
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'roleId',
+            message: 'Select the role to delete:',
+            choices: roles
+          }
+        ]).then((answers) => {
+          const deleteQuery = 'DELETE FROM roles WHERE id = $1';
+  
+          client.query(deleteQuery, [answers.roleId], (deleteErr) => {
+            if (deleteErr) {
+              console.error('Query error', deleteErr.stack);
+            } else {
+              console.log('Role deleted successfully!');
+              tracker();
+            }
+          });
+        });
       }
-    );
-  });
-}
+    });
+  }
 
 // VIEW DEPARTMENTS
 function viewDepartments() {
@@ -418,27 +560,36 @@ function addDepartment() {
 
 // DELETE DEPARTMENT
 function deleteDepartment() {
-  inquirer.prompt([
-    {
-      type: 'input',
-      name: 'departmentId',
-      message: 'Enter the ID of the department you want to delete:'
-    }
-  ]).then((answers) => {
-    client.query(
-      'DELETE FROM departments WHERE id = $1',
-      [answers.departmentId],
-      (err) => {
-        if (err) {
-          console.error('Query error', err.stack);
-        } else {
-          console.log('Department deleted!');
-          tracker();
-        }
+    const departmentQuery = 'SELECT id, name FROM departments';
+  
+    client.query(departmentQuery, (departmentErr, departmentRes) => {
+      if (departmentErr) {
+        console.error('Query error', departmentErr.stack);
+      } else {
+        const departments = departmentRes.rows.map(department => ({ name: department.name, value: department.id }));
+  
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'departmentId',
+            message: 'Select the department to delete:',
+            choices: departments
+          }
+        ]).then((answers) => {
+          const deleteQuery = 'DELETE FROM departments WHERE id = $1';
+  
+          client.query(deleteQuery, [answers.departmentId], (deleteErr) => {
+            if (deleteErr) {
+              console.error('Query error', deleteErr.stack);
+            } else {
+              console.log('Department deleted successfully!');
+              tracker();
+            }
+          });
+        });
       }
-    );
-  });
-}
+    });
+  }
 
 // VIEW DEPARTMENT BUDGET
 function viewDepartmentBudget() {
