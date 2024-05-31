@@ -108,94 +108,111 @@ function viewEmployees() {
 
 // ADD EMPLOYEE
 function addEmployee() {
-    const roleQuery = 'SELECT id, title FROM roles';
-    const managerQuery = 'SELECT id, CONCAT(first_name, last_name) AS name FROM employees';
-    
-    
-    client.query(roleQuery, (roleErr, roleRes) => {
-      if (roleErr) {
-        console.error('Query error', roleErr.stack);
-      } else {
-        const roles = roleRes.rows.map(role => ({ name: role.title, value: role.id }));
-        
-        client.query(managerQuery, (managerErr, managerRes) => {
-          if (managerErr) {
-            console.error('Query error', managerErr.stack);
-          } else {
-            const managers = managerRes.rows.map(manager => ({ name: manager.name, value: manager.id }));
-            managers.push({ name: 'None', value: null });
-  
-            inquirer.prompt([
-              {
-                type: 'input',
-                name: 'firstName',
-                message: 'Enter the first name of the employee:'
-              },
-              {
-                type: 'input',
-                name: 'lastName',
-                message: 'Enter the last name of the employee:'
-              },
-              {
-                type: 'list',
-                name: 'roleId',
-                message: 'Select the role for the employee:',
-                choices: roles
-              },
-              {
-                type: 'list',
-                name: 'managerId',
-                message: 'Select the manager for the employee (if any):',
-                choices: managers
-              }
-            ]).then((answers) => {
-              client.query(
-                'INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)',
-                [answers.firstName, answers.lastName, answers.roleId, answers.managerId],
-                (err) => {
-                  if (err) {
-                    console.error('Query error', err.stack);
-                  } else {
-                    console.log('Employee added!');
-                    tracker();
-                  }
-                }
-              );
-            });
-          }
-        });
+  client.query('SELECT id, title FROM roles', (err, roleRes) => {
+    if (err) {
+      console.error('Query error', err.stack);
+      return;
+    }
+    const roleChoices = roleRes.rows.map(role => ({
+      name: role.title,
+      value: role.id
+    }));
+    client.query('SELECT id, first_name, last_name FROM employees', (err, managerRes) => {
+      if (err) {
+        console.error('Query error', err.stack);
+        return;
       }
+      const managerChoices = managerRes.rows.map(emp => ({
+        name: `${emp.first_name} ${emp.last_name}`,
+        value: emp.id
+      }));
+      managerChoices.unshift({ name: 'None', value: null });
+      inquirer.prompt([
+        {
+          type: 'input',
+          name: 'firstName',
+          message: 'Enter the first name of the employee:'
+        },
+        {
+          type: 'input',
+          name: 'lastName',
+          message: 'Enter the last name of the employee:'
+        },
+        {
+          type: 'list',
+          name: 'roleId',
+          message: 'Select the role for the employee:',
+          choices: roleChoices
+        },
+        {
+          type: 'list',
+          name: 'managerId',
+          message: 'Select the manager for the employee:',
+          choices: managerChoices
+        }
+      ]).then((answers) => {
+        client.query(
+          'INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)',
+          [answers.firstName, answers.lastName, answers.roleId, answers.managerId],
+          (err) => {
+            if (err) {
+              console.error('Query error', err.stack);
+            } else {
+              console.log('Employee added!');
+              tracker();
+            }
+          }
+        );
+      });
     });
-  }
-    
+  });
+}
   
 // UPDATE EMPLOYEE MANAGER
 function updateEmployeeManager() {
-    const employeeQuery = 'SELECT id, CONCAT(first_name, last_name) AS name FROM employees';
-  
-    client.query(employeeQuery, (employeeErr, employeeRes) => {
-      if (employeeErr) {
-        console.error('Query error', employeeErr.stack);
-      } else {
-        const employees = employeeRes.rows.map(employee => ({ name: employee.name, value: employee.id }));
-  
+
+  client.query('SELECT id, first_name, last_name FROM employees', (err, res) => {
+    if (err) {
+      console.error('Query error', err.stack);
+      return;
+    }
+    const employeeChoices = res.rows.map(emp => ({
+      name: `${emp.first_name} ${emp.last_name}`,
+      value: emp.id
+    }));
+
+    inquirer.prompt([
+      {
+        type: 'list',
+        name: 'employeeId',
+        message: 'Select the employee to update:',
+        choices: employeeChoices
+      }
+    ]).then((selectedEmployee) => {
+      client.query('SELECT id, first_name, last_name FROM employees WHERE id != $1', [selectedEmployee.employeeId], (err, res) => {
+        if (err) {
+          console.error('Query error', err.stack);
+          return;
+        }
+
+        const managerChoices = res.rows.map(emp => ({
+          name: `${emp.first_name} ${emp.last_name}`,
+          value: emp.id
+        }));
+
+        managerChoices.unshift({ name: 'None', value: null });
+
         inquirer.prompt([
           {
             type: 'list',
-            name: 'employeeId',
-            message: 'Select the employee whose manager you want to update:',
-            choices: employees
-          },
-          {
-            type: 'list',
-            name: 'newManagerId',
-            message: 'Select the new manager for the employee:',
-            choices: [...employees, { name: 'None', value: null }]
+            name: 'managerId',
+            message: 'Select the new manager:',
+            choices: managerChoices
           }
         ]).then((answers) => {
           client.query(
             'UPDATE employees SET manager_id = $1 WHERE id = $2',
-            [answers.newManagerId, answers.employeeId],
+            [answers.managerId, selectedEmployee.employeeId],
             (err) => {
               if (err) {
                 console.error('Query error', err.stack);
@@ -206,60 +223,63 @@ function updateEmployeeManager() {
             }
           );
         });
+      });
+    });
+  });
+}
+
+//Update Employee Role
+  function updateEmployeeRole() {
+    client.query('SELECT id, first_name, last_name FROM employees', (err, res) => {
+      if (err) {
+        console.error('Query error', err.stack);
+        return;
       }
+      const employeeChoices = res.rows.map(emp => ({
+        name: `${emp.first_name} ${emp.last_name}`,
+        value: emp.id
+      }));
+  
+      client.query('SELECT id, title FROM roles', (err, res) => {
+        if (err) {
+          console.error('Query error', err.stack);
+          return;
+        }
+        const roleChoices = res.rows.map(role => ({
+          name: role.title,
+          value: role.id
+        }));
+        inquirer.prompt([
+          {
+            type: 'list',
+            name: 'employeeId',
+            message: 'Select the employee to update:',
+            choices: employeeChoices
+          },
+          {
+            type: 'list',
+            name: 'newRoleId',
+            message: 'Select the new role:',
+            choices: roleChoices
+          }
+        ]).then((answers) => {
+          client.query(
+            'UPDATE employees SET role_id = $1 WHERE id = $2',
+            [answers.newRoleId, answers.employeeId],
+            (err) => {
+              if (err) {
+                console.error('Query error', err.stack);
+              } else {
+                console.log('Employee role updated!');
+                tracker();
+              }
+            }
+          );
+        });
+      });
     });
   }
   
-// UPDATE EMPLOYEE ROLE
-function updateEmployeeRole() {
-    const employeeQuery = 'SELECT id, CONCAT(first_name, last_name) AS name FROM employees';
-    const roleQuery = 'SELECT id, title FROM roles';
-  
-    client.query(employeeQuery, (employeeErr, employeeRes) => {
-      if (employeeErr) {
-        console.error('Query error', employeeErr.stack);
-      } else {
-        const employees = employeeRes.rows.map(employee => ({ name: employee.name, value: employee.id }));
-  
-        client.query(roleQuery, (roleErr, roleRes) => {
-          if (roleErr) {
-            console.error('Query error', roleErr.stack);
-          } else {
-            const roles = roleRes.rows.map(role => ({ name: role.title, value: role.id }));
-  
-            inquirer.prompt([
-              {
-                type: 'list',
-                name: 'employeeId',
-                message: 'Select the employee you want to update:',
-                choices: employees
-              },
-              {
-                type: 'list',
-                name: 'newRoleId',
-                message: 'Select the new role for the employee:',
-                choices: roles
-              }
-            ]).then((answers) => {
-              client.query(
-                'UPDATE employees SET role_id = $1 WHERE id = $2',
-                [answers.newRoleId, answers.employeeId],
-                (err) => {
-                  if (err) {
-                    console.error('Query error', err.stack);
-                  } else {
-                    console.log('Employee role updated!');
-                    tracker();
-                  }
-                }
-              );
-            });
-          }
-        });
-      }
-    });
-  } 
-
 // VIEW EMPLOYEES BY DEPARTMENT
 function viewEmployeesByDepartment() {
     const departmentQuery = 'SELECT id, name FROM departments';
@@ -340,7 +360,7 @@ function deleteEmployee() {
         });
       }
     });
-  }
+}
    
 // VIEW ROLES
 function viewRoles() {
@@ -361,9 +381,9 @@ function viewRoles() {
           }));
           console.table(result);
           tracker();
-        }
-      });
-    }
+       }
+   });
+}
 
 // ADD ROLE
 function addRole() {
