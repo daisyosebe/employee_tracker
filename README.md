@@ -32,6 +32,8 @@ Repo Link: (https://github.com/daisyosebe/my_employees.git)
 
 
 VIDEO:
+[Untitled_ May 31, 2024 12_57 AM.webm](https://github.com/daisyosebe/my_employees/assets/145105156/6639b83f-27f3-474e-a59b-7484bf688cb7)
+[Untitled_ May 31, 2024 12_57 AM.webm](https://github.com/daisyosebe/my_employees/assets/145105156/6639b83f-27f3-474e-a59b-7484bf688cb7)
 
 
 ## Resources
